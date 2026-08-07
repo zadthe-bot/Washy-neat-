@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "TestConnection": {
+      "title": "TestConnection",
+      "description": "Firestore connection status check document",
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "status": { "type": "string" },
+        "lastTestedAt": { "type": "string" }
+      }
+    },
+    "WashyNeatOrder": {
+      "title": "WashyNeatOrder",
+      "description": "Laundry and dry cleaning order for Washy Neat app",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userPhone": { "type": "string" },
+        "services": { "type": "array" },
+        "pickupDate": { "type": "string" },
+        "pickupTimeSlot": { "type": "string" },
+        "deliveryDate": { "type": "string" },
+        "address": { "type": "string" },
+        "specialInstructions": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "paymentStatus": { "type": "string" },
+        "createdAt": { "type": "object" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["userId", "services", "pickupDate", "address", "totalAmount", "status"]
+    }
+  },
+  "firestore": {
+    "/test/{testId}": {
+      "schema": { "$ref": "#/entities/TestConnection" },
+      "description": "Connection verification collection"
+    },
+    "/washy_neat_orders/{orderId}": {
+      "schema": { "$ref": "#/entities/WashyNeatOrder" },
+      "description": "Customer laundry orders collection"
+    }
+  }
+}

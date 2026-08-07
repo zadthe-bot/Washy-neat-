@@ -1,0 +1,6 @@
+{
+  "name": "Washy Neat",
+  "description": "Android mobile laundry and dry cleaning application with pickup scheduling, order tracking, and Firebase integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
