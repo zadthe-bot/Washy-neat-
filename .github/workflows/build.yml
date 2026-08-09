@@ -37,7 +37,10 @@ jobs:
         run: npx cap sync android || true
 
       - name: Make Gradlew Executable
-        run: chmod +x android/gradlew
+        run: |
+          if [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+          fi
 
       - name: Build Android APK (Debug)
         run: |
