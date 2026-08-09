@@ -1,0 +1,11 @@
+# Mark binary files to prevent git line-ending corruption
+*.jar binary
+*.so binary
+*.aar binary
+*.png binary
+*.jpg binary
+*.keystore binary
+
+# Ensure Unix line endings for shell scripts
+gradlew text eol=lf
+*.sh text eol=lf
