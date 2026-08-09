@@ -36,9 +36,43 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android || true
 
-      - name: Make Gradlew Executable and Ensure Wrapper
+      - name: Make Gradlew Executable and Ensure Config
         run: |
           cd android
+          if [ ! -f "app/google-services.json" ] || [ ! -s "app/google-services.json" ] || [ "$(cat app/google-services.json)" = "{}" ]; then
+            echo "Creating default google-services.json for com.washyneat.app..."
+            cat << 'EOF' > app/google-services.json
+{
+  "project_info": {
+    "project_number": "123456789012",
+    "project_id": "washy-neat-app",
+    "storage_bucket": "washy-neat-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
+        "android_client_info": {
+          "package_name": "com.washyneat.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDummyApiKeyForBuildPurposeOnly12345"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+EOF
+          fi
           if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ] || ! java -cp gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain -v >/dev/null 2>&1; then
             echo "Gradle wrapper JAR is missing or corrupted. Regenerating using gradle CLI..."
             gradle wrapper --gradle-version 8.2.1
