@@ -1,5 +1,8 @@
 name: Bootstrap Android Gradle Project
 
+permissions:
+  contents: write
+
 on:
   workflow_dispatch:
   push:
