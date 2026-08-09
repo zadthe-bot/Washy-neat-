@@ -36,6 +36,26 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android || true
 
+      - name: Ensure Google Services Plugin in Gradle
+        run: |
+          if [ -f "android/build.gradle" ]; then
+            if ! grep -q "com.google.gms.google-services" android/build.gradle; then
+              echo "Adding google-services plugin to android/build.gradle"
+              cat << 'EOF' >> android/build.gradle
+
+plugins {
+    id 'com.google.gms.google-services' version '4.5.0' apply false
+}
+EOF
+            fi
+          fi
+          if [ -f "android/app/build.gradle" ]; then
+            if ! grep -q "com.google.gms.google-services" android/app/build.gradle; then
+              echo "Adding google-services plugin to android/app/build.gradle"
+              sed -i "/id 'com.android.application'/a \    id 'com.google.gms.google-services'" android/app/build.gradle || true
+            fi
+          fi
+
       - name: Make Gradlew Executable
         run: |
           if [ -f "android/gradlew" ]; then
