@@ -1,0 +1,61 @@
+name: Generate and Commit Android Gradle Files
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Android project
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap add android
+          else
+            echo "android folder already exists - skipping cap add android"
+          fi
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Check generated Gradle files
+        run: |
+          echo "Checking Android project..."
+          test -f android/gradlew
+          test -f android/build.gradle
+          test -f android/app/build.gradle
+          echo "Gradle files found successfully."
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      - name: Commit Android and Gradle files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add android
+
+          if git diff --cached --quiet; then
+            echo "No Android changes to commit."
+          else
+            git commit -m "Generate Android Gradle project"
+            git push
+          fi
