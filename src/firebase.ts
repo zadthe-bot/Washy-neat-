@@ -35,7 +35,7 @@ import { getMessaging, Messaging, isSupported as isMessagingSupported, getToken 
 const DEFAULT_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCNqY8PT5v-v32HOJRoa6Iz_Uhej-Epudg",
   authDomain: "washy-neat-app.firebaseapp.com",
-  projectId: "washy-neat-app",
+  projectId: "gen-lang-client-0931280678",
   storageBucket: "washy-neat-app.appspot.com",
   messagingSenderId: "102938475610",
   appId: "1:102938475610:web:9876543210abcdef"
