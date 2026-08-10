@@ -33,7 +33,7 @@ import { getMessaging, Messaging, isSupported as isMessagingSupported, getToken 
 
 // Default / Fallback configuration if real credentials aren't supplied yet
 const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyWashyNeatAppDefaultKey12345",
+  apiKey: "AIzaSyCNqY8PT5v-v32HOJRoa6Iz_Uhej-Epudg",
   authDomain: "washy-neat-app.firebaseapp.com",
   projectId: "washy-neat-app",
   storageBucket: "washy-neat-app.appspot.com",
