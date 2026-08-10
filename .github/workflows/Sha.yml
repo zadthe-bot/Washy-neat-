@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  create-key:
+  signing-key:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,35 +17,53 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Create release keystore
+      - name: Create signing key
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          keytool -genkeypair \
-            -v \
-            -keystore urbanwash-release.keystore \
-            -alias urbanwash \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
-            -keypass "${{ secrets.KEY_PASSWORD }}" \
-            -dname "CN=Urban Wash,O=Urban Wash,L=Dar es Salaam,ST=Dar es Salaam,C=TZ"
+          if [ -f "urbanwash-release.keystore" ]; then
+            echo "Keystore already exists. Reusing it."
+          else
+            echo "Creating new Android release keystore..."
 
-      - name: Show SHA fingerprints
+            keytool -genkeypair \
+              -v \
+              -keystore urbanwash-release.keystore \
+              -alias urbanwash \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEYSTORE_PASSWORD" \
+              -dname "CN=Urban Wash,O=Urban Wash,C=TZ"
+
+            echo "Keystore created successfully."
+          fi
+
+      - name: Print SHA-1 and SHA-256
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          echo "=========================================="
-          echo "ANDROID RELEASE SHA FINGERPRINTS"
-          echo "=========================================="
+          echo ""
+          echo "=============================================="
+          echo "        URBAN WASH ANDROID FINGERPRINTS"
+          echo "=============================================="
+          echo ""
 
           keytool -list \
             -v \
             -keystore urbanwash-release.keystore \
             -alias urbanwash \
-            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -storepass "$KEYSTORE_PASSWORD" \
             | grep -E "SHA1:|SHA256:"
 
-          echo "=========================================="
+          echo ""
+          echo "=============================================="
+          echo "IMPORTANT:"
+          echo "Add BOTH fingerprints to Firebase."
+          echo "=============================================="
 
-      - name: Upload keystore securely
+      - name: Upload keystore
         uses: actions/upload-artifact@v4
         with:
           name: urbanwash-release-keystore
