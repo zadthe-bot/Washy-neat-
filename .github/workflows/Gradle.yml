@@ -11,57 +11,87 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Get your repository
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Setup Node.js
+      # 2. Setup Node.js 22
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      # 3. Install npm dependencies
+      # 3. Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4. Build React/Vite web app
+      # 4. Build React/Vite application
       - name: Build web app
         run: npm run build
 
-      # 5. Generate Android project and Gradle files
+      # 5. Generate Android project
       - name: Generate Android project
         run: |
-          if [ ! -d "android" ]; then
-            echo "Android project does not exist. Creating it..."
-            npx cap add android
+          if [ -f "android/gradlew" ]; then
+            echo "Complete Android project already exists."
           else
-            echo "Android project already exists. Skipping creation."
+            echo "Android Gradle project is missing or incomplete."
+
+            if [ -d "android" ]; then
+              echo "Removing incomplete Android folder..."
+              rm -rf android
+            fi
+
+            echo "Generating Android project..."
+            npx cap add android
           fi
 
-      # 6. Sync web app into Android project
-      - name: Sync Capacitor
-        run: npx cap sync android
+      # 6. Verify Gradle wrapper
+      - name: Verify Gradle wrapper
+        run: |
+          echo "Checking Android Gradle files..."
+
+          if [ ! -f "android/gradlew" ]; then
+            echo "ERROR: android/gradlew was not generated."
+            echo "Contents of android folder:"
+            ls -la android || true
+            exit 1
+          fi
+
+          if [ ! -f "android/build.gradle" ]; then
+            echo "ERROR: android/build.gradle is missing."
+            exit 1
+          fi
+
+          if [ ! -f "android/app/build.gradle" ]; then
+            echo "ERROR: android/app/build.gradle is missing."
+            exit 1
+          fi
+
+          if [ ! -f "android/settings.gradle" ]; then
+            echo "ERROR: android/settings.gradle is missing."
+            exit 1
+          fi
+
+          echo "All required Gradle files exist."
 
       # 7. Make Gradle executable
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      # 8. Verify important Gradle files
-      - name: Verify Android Gradle files
+      # 8. Sync Capacitor
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # 9. Check generated Android project
+      - name: List Android project
         run: |
-          echo "Checking Android project..."
+          echo "Android project:"
+          find android -maxdepth 2 -type f | sort
 
-          test -f android/gradlew
-          test -f android/build.gradle
-          test -f android/settings.gradle
-          test -f android/app/build.gradle
-
-          echo "All required Gradle files exist."
-
-      # 9. Commit generated Android project
+      # 10. Commit Android project
       - name: Commit Android project
         run: |
           git config user.name "github-actions[bot]"
@@ -70,7 +100,7 @@ jobs:
           git add android
 
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo "No Android changes to commit."
           else
             git commit -m "Generate Android Gradle project"
             git push
