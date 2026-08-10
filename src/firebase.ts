@@ -1,17 +1,23 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import {
+  initializeApp,
+  getApps,
+  getApp,
+  FirebaseApp,
+} from "firebase/app";
+
+import { Capacitor } from "@capacitor/core";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
+
 import {
   getAuth,
   Auth,
   GoogleAuthProvider,
-  signInWithCredential,
   signInWithPopup,
+  signInWithCredential,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   signInAnonymously,
-} from 'firebase/auth';
-
-import { Capacitor } from '@capacitor/core';
-import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+} from "firebase/auth";
 
 import {
   getFirestore,
@@ -26,100 +32,177 @@ import {
   onSnapshot,
   addDoc,
   serverTimestamp,
-} from 'firebase/firestore';
+} from "firebase/firestore";
 
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import {
+  getStorage,
+  FirebaseStorage,
+} from "firebase/storage";
 
 import {
   getMessaging,
   Messaging,
   isSupported as isMessagingSupported,
-} from 'firebase/messaging';
+} from "firebase/messaging";
 
+export { onAuthStateChanged };
 
-// ============================================================
-// FIREBASE CONFIGURATION
-// ============================================================
-//
-// These values come from your Firebase project.
-//
-// Android google-services.json:
-//
-// project_number:
-// 1008039064034
-//
-// project_id:
-// gen-lang-client-0931280678
-//
-// storage_bucket:
-// gen-lang-client-0931280678.firebasestorage.app
-//
-// mobilesdk_app_id:
-// 1:1008039064034:android:9a9b72de8077917986c9bb
-//
-// api_key:
-// AIzaSyCNqY8PT5v-v32HOJRoa6Iz_Uhej-Epudg
-//
-// DO NOT add a fake authDomain.
-// DO NOT use the old washy-neat-app values.
-//
-// Native Android Google Sign-In is handled by
-// @capacitor-firebase/authentication + google-services.json.
-//
-
-const firebaseConfig = {
-  apiKey: 'AIzaSyCNqY8PT5v-v32HOJRoa6Iz_Uhej-Epudg',
-  projectId: 'gen-lang-client-0931280678',
-  storageBucket: 'gen-lang-client-0931280678.firebasestorage.app',
-  messagingSenderId: '1008039064034',
-  appId: '1:1008039064034:android:9a9b72de8077917986c9bb',
+/**
+ * Firebase configuration
+ *
+ * These values come from your Firebase project's
+ * google-services.json:
+ *
+ * project_number       -> messagingSenderId
+ * project_id           -> projectId
+ * storage_bucket       -> storageBucket
+ * mobilesdk_app_id     -> appId
+ * current_key          -> apiKey
+ *
+ * Your google-services.json is for an Android app,
+ * so it does not contain an authDomain.
+ *
+ * Native Android Google Sign-In does not require
+ * authDomain for this configuration.
+ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCNqY8PT5v-v32HOJRoa6Iz_Uhej-Epudg",
+  projectId: "gen-lang-client-0931280678",
+  storageBucket: "gen-lang-client-0931280678.firebasestorage.app",
+  messagingSenderId: "1008039064034",
+  appId: "1:1008039064034:android:9a9b72de8077917986c9bb",
 };
 
-
-// ============================================================
-// INITIALIZE FIREBASE
-// ============================================================
-
-let app: FirebaseApp;
-
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+/**
+ * Return the Firebase configuration being used.
+ */
+export function getStoredFirebaseConfig() {
+  return FIREBASE_CONFIG;
 }
 
-const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
-const storage: FirebaseStorage = getStorage(app);
+/**
+ * Parse google-services.json.
+ *
+ * This is kept because FirebaseTestScreen.tsx imports
+ * parseGoogleServicesJson().
+ */
+export function parseGoogleServicesJson(jsonContent: string) {
+  try {
+    const data = JSON.parse(jsonContent);
 
+    const client = data.client?.[0];
+    const projectInfo = data.project_info;
+
+    if (!client || !projectInfo) {
+      throw new Error(
+        "Invalid google-services.json: missing client or project_info."
+      );
+    }
+
+    const apiKey =
+      client.api_key?.[0]?.current_key;
+
+    const projectId =
+      projectInfo.project_id;
+
+    const storageBucket =
+      projectInfo.storage_bucket;
+
+    const messagingSenderId =
+      projectInfo.project_number;
+
+    const appId =
+      client.client_info?.mobilesdk_app_id;
+
+    const packageName =
+      client.client_info?.android_client_info?.package_name;
+
+    if (
+      !apiKey ||
+      !projectId ||
+      !messagingSenderId ||
+      !appId
+    ) {
+      throw new Error(
+        "google-services.json is missing required Firebase configuration values."
+      );
+    }
+
+    return {
+      apiKey,
+      projectId,
+      storageBucket,
+      messagingSenderId,
+      appId,
+      packageName,
+    };
+  } catch (error: any) {
+    console.error(
+      "Failed to parse google-services.json:",
+      error
+    );
+
+    throw new Error(
+      error?.message ||
+        "Failed to parse google-services.json."
+    );
+  }
+}
+
+/**
+ * Initialize Firebase.
+ */
+let app: FirebaseApp;
+let auth: Auth;
+let db: Firestore;
+let storage: FirebaseStorage;
 let messaging: Messaging | null = null;
 
+try {
+  if (!getApps().length) {
+    app = initializeApp(FIREBASE_CONFIG);
+  } else {
+    app = getApp();
+  }
 
-// ============================================================
-// FIREBASE CLOUD MESSAGING
-// ============================================================
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
 
-isMessagingSupported()
-  .then((supported) => {
-    if (supported) {
-      try {
-        messaging = getMessaging(app);
-      } catch (error) {
-        console.warn(
-          'Firebase Messaging initialization skipped:',
-          error
-        );
+  /**
+   * Firebase Cloud Messaging is mainly useful on
+   * supported web environments.
+   *
+   * Native Android push notifications are handled
+   * through Capacitor Firebase plugins.
+   */
+  isMessagingSupported()
+    .then((supported) => {
+      if (supported) {
+        try {
+          messaging = getMessaging(app);
+        } catch (error) {
+          console.warn(
+            "Firebase Messaging initialization skipped:",
+            error
+          );
+        }
       }
-    }
-  })
-  .catch(() => {
-    console.log('Firebase Messaging is not supported on this platform.');
-  });
+    })
+    .catch((error) => {
+      console.warn(
+        "Firebase Messaging support check failed:",
+        error
+      );
+    });
+} catch (error) {
+  console.error(
+    "Firebase initialization failed:",
+    error
+  );
 
-
-// ============================================================
-// EXPORT FIREBASE SERVICES
-// ============================================================
+  throw error;
+}
 
 export {
   app,
@@ -127,246 +210,240 @@ export {
   db,
   storage,
   messaging,
-  onAuthStateChanged,
 };
 
-
-// ============================================================
-// GOOGLE AUTHENTICATION
-// ============================================================
-
-export const googleProvider = new GoogleAuthProvider();
-
-
-// Native Android/iOS Google Sign-In
-export async function loginWithGoogle() {
-  try {
-
-    // ----------------------------------------------------------
-    // NATIVE ANDROID / IOS
-    // ----------------------------------------------------------
-
-    if (Capacitor.isNativePlatform()) {
-
-      console.log('Starting native Google Sign-In...');
-
-      const result =
-        await FirebaseAuthentication.signInWithGoogle();
-
-      console.log('Native Google Sign-In result:', result);
-
-      if (!result.credential?.idToken) {
-        throw new Error(
-          'Google Sign-In succeeded but no Google ID token was returned.'
-        );
-      }
-
-      // Convert Google's native ID token into a Firebase credential
-      const credential = GoogleAuthProvider.credential(
-        result.credential.idToken
-      );
-
-      // Sign that credential into the Firebase JS Auth instance
-      const firebaseResult =
-        await signInWithCredential(auth, credential);
-
-      console.log(
-        'Firebase authentication successful:',
-        firebaseResult.user.uid
-      );
-
-      return firebaseResult;
-    }
-
-
-    // ----------------------------------------------------------
-    // WEB ONLY
-    // ----------------------------------------------------------
-    //
-    // This is only used when running the Vite application
-    // in a browser.
-    //
-    // The Android APK DOES NOT use this path.
-    //
-
-    return await signInWithPopup(
-      auth,
-      googleProvider
-    );
-
-  } catch (error: any) {
-
-    console.error(
-      'Google Sign-In failed:',
-      error
-    );
-
-    console.error(
-      'Error code:',
-      error?.code
-    );
-
-    console.error(
-      'Error message:',
-      error?.message
-    );
-
-    throw error;
-  }
-}
-
-
-// ============================================================
-// ANONYMOUS AUTHENTICATION
-// ============================================================
-
-export async function loginAnonymously() {
-  try {
-    return await signInAnonymously(auth);
-  } catch (error: any) {
-    console.error(
-      'Anonymous Sign-In failed:',
-      error
-    );
-
-    throw error;
-  }
-}
-
-
-// ============================================================
-// LOGOUT
-// ============================================================
-
-export async function logoutUser() {
-  try {
-
-    // Sign out of native Google/Firebase Authentication plugin
-    if (Capacitor.isNativePlatform()) {
-      try {
-        await FirebaseAuthentication.signOut();
-      } catch (error) {
-        console.warn(
-          'Native Firebase sign-out warning:',
-          error
-        );
-      }
-    }
-
-    // Sign out of Firebase JS SDK
-    await firebaseSignOut(auth);
-
-  } catch (error: any) {
-
-    console.error(
-      'Logout failed:',
-      error
-    );
-
-    throw error;
-  }
-}
-
-
-// ============================================================
-// TEST FIREBASE CONNECTION
-// ============================================================
-
+/**
+ * Test Firestore connection.
+ */
 export async function testFirebaseConnection(): Promise<{
   connected: boolean;
   message: string;
-  source: 'server' | 'cache' | 'mock';
+  source: "server" | "cache" | "mock";
   timestamp?: string;
   projectId: string;
   error?: string;
 }> {
-
   try {
-
     const testDocRef = doc(
       db,
-      'test',
-      'connection'
+      "test",
+      "connection"
     );
 
+    /**
+     * Try writing a test document.
+     *
+     * If Firestore rules reject the write, we continue
+     * and attempt a server read.
+     */
     try {
-
       await setDoc(
         testDocRef,
         {
-          appName: 'Washy Neat',
-          status: 'active',
-          lastTestedAt: new Date().toISOString(),
+          appName: "Washy Neat",
+          status: "active",
+          lastTestedAt:
+            new Date().toISOString(),
         },
         {
           merge: true,
         }
       );
-
     } catch (writeError) {
-
       console.warn(
-        'Firebase test write failed:',
+        "Firestore test write failed:",
         writeError
       );
-
     }
 
-
+    /**
+     * Force a server request.
+     */
     const snap =
       await getDocFromServer(testDocRef);
 
-
     if (snap.exists()) {
-
       return {
         connected: true,
-        message: 'Firebase Connected Successfully',
-        source: 'server',
-        timestamp: new Date().toLocaleTimeString(),
-        projectId: firebaseConfig.projectId,
+        message:
+          "Firebase Connected Successfully",
+        source: "server",
+        timestamp:
+          new Date().toLocaleTimeString(),
+        projectId:
+          FIREBASE_CONFIG.projectId,
       };
-
     }
-
-
-    const cachedSnap =
-      await getDoc(testDocRef);
 
     return {
       connected: true,
-      message: 'Firebase Connected Successfully',
-      source: cachedSnap.exists()
-        ? 'cache'
-        : 'server',
-      timestamp: new Date().toLocaleTimeString(),
-      projectId: firebaseConfig.projectId,
+      message:
+        "Firebase Connected Successfully",
+      source: "server",
+      timestamp:
+        new Date().toLocaleTimeString(),
+      projectId:
+        FIREBASE_CONFIG.projectId,
     };
-
   } catch (error: any) {
-
-    console.error(
-      'Firebase connection test failed:',
+    console.warn(
+      "Firestore server check failed:",
       error
     );
 
+    const errorMessage =
+      error?.message || String(error);
+
+    if (
+      errorMessage.includes(
+        "client is offline"
+      ) ||
+      errorMessage.includes(
+        "Could not reach Cloud Firestore"
+      ) ||
+      errorMessage.includes(
+        "permission-denied"
+      )
+    ) {
+      return {
+        connected: false,
+        message:
+          "Firebase connection failed. Check Firebase configuration or Firestore rules.",
+        source: "mock",
+        projectId:
+          FIREBASE_CONFIG.projectId,
+        error: errorMessage,
+      };
+    }
+
     return {
       connected: false,
-      message: 'Firebase Connection Failed',
-      source: 'mock',
-      projectId: firebaseConfig.projectId,
-      error: error?.message || String(error),
+      message:
+        "Firebase connection failed.",
+      source: "mock",
+      projectId:
+        FIREBASE_CONFIG.projectId,
+      error: errorMessage,
     };
   }
 }
 
+/**
+ * Google authentication provider.
+ */
+export const googleProvider =
+  new GoogleAuthProvider();
 
-// ============================================================
-// WASHY NEAT ORDER
-// ============================================================
+/**
+ * Google Sign-In.
+ *
+ * Android:
+ * Uses @capacitor-firebase/authentication.
+ *
+ * Web:
+ * Uses Firebase popup authentication.
+ */
+export async function loginWithGoogle() {
+  try {
+    /**
+     * Native Android/iOS flow.
+     */
+    if (Capacitor.isNativePlatform()) {
+      const result =
+        await FirebaseAuthentication.signInWithGoogle();
 
+      if (result.credential?.idToken) {
+        const credential =
+          GoogleAuthProvider.credential(
+            result.credential.idToken
+          );
+
+        return await signInWithCredential(
+          auth,
+          credential
+        );
+      }
+
+      if (result.user) {
+        return result;
+      }
+
+      throw new Error(
+        "Google Sign-In did not return a credential or user."
+      );
+    }
+
+    /**
+     * Browser/web flow.
+     */
+    return await signInWithPopup(
+      auth,
+      googleProvider
+    );
+  } catch (error: any) {
+    console.error(
+      "Google Sign-In failed:",
+      error
+    );
+
+    throw error;
+  }
+}
+
+/**
+ * Anonymous authentication.
+ */
+export async function loginAnonymously() {
+  try {
+    return await signInAnonymously(auth);
+  } catch (error: any) {
+    console.error(
+      "Anonymous Sign-In failed:",
+      error
+    );
+
+    throw error;
+  }
+}
+
+/**
+ * Sign out.
+ */
+export async function logoutUser() {
+  try {
+    /**
+     * Sign out from the native Capacitor
+     * authentication plugin.
+     */
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await FirebaseAuthentication.signOut();
+      } catch (error) {
+        console.warn(
+          "Native FirebaseAuthentication sign-out failed:",
+          error
+        );
+      }
+    }
+
+    /**
+     * Also sign out from Firebase Web SDK.
+     */
+    await firebaseSignOut(auth);
+  } catch (error) {
+    console.error(
+      "Firebase sign-out failed:",
+      error
+    );
+
+    throw error;
+  }
+}
+
+/**
+ * Washy Neat Order.
+ */
 export interface WashyNeatOrder {
-
   id?: string;
 
   userId: string;
@@ -378,15 +455,10 @@ export interface WashyNeatOrder {
   userPhone?: string;
 
   services: {
-
     serviceId: string;
-
     serviceName: string;
-
     quantity: number;
-
     pricePerUnit: number;
-
   }[];
 
   pickupDate: string;
@@ -402,46 +474,45 @@ export interface WashyNeatOrder {
   totalAmount: number;
 
   status:
-    | 'Order Placed'
-    | 'Picked Up'
-    | 'In Washing'
-    | 'Ironing & Folding'
-    | 'Out for Delivery'
-    | 'Delivered';
+    | "Order Placed"
+    | "Picked Up"
+    | "In Washing"
+    | "Ironing & Folding"
+    | "Out for Delivery"
+    | "Delivered";
 
   paymentMethod:
-    | 'Cash on Delivery'
-    | 'Card'
-    | 'Mobile Wallet';
+    | "Cash on Delivery"
+    | "Card"
+    | "Mobile Wallet";
 
   paymentStatus:
-    | 'Pending'
-    | 'Paid';
+    | "Pending"
+    | "Paid";
 
   createdAt?: any;
 
   updatedAt?: any;
 }
 
-
-// ============================================================
-// CREATE ORDER
-// ============================================================
-
+/**
+ * Create Washy Neat order.
+ */
 export async function createWashyNeatOrder(
-  order: Omit<WashyNeatOrder, 'id'>
+  order: Omit<WashyNeatOrder, "id">
 ) {
-
   try {
-
     const docRef = await addDoc(
-      collection(db, 'washy_neat_orders'),
+      collection(
+        db,
+        "washy_neat_orders"
+      ),
       {
         ...order,
-
-        createdAt: serverTimestamp(),
-
-        updatedAt: serverTimestamp(),
+        createdAt:
+          serverTimestamp(),
+        updatedAt:
+          serverTimestamp(),
       }
     );
 
@@ -449,11 +520,9 @@ export async function createWashyNeatOrder(
       id: docRef.id,
       ...order,
     };
-
   } catch (error) {
-
     console.error(
-      'Failed to create Firestore order:',
+      "Failed to create Firestore order:",
       error
     );
 
@@ -461,66 +530,66 @@ export async function createWashyNeatOrder(
   }
 }
 
-
-// ============================================================
-// SUBSCRIBE TO USER ORDERS
-// ============================================================
-
+/**
+ * Subscribe to a user's orders.
+ */
 export function subscribeToUserOrders(
   userId: string,
-  callback: (orders: WashyNeatOrder[]) => void
+  callback: (
+    orders: WashyNeatOrder[]
+  ) => void
 ) {
-
   try {
-
-    const q = query(
-      collection(db, 'washy_neat_orders'),
-      where('userId', '==', userId)
+    const ordersQuery = query(
+      collection(
+        db,
+        "washy_neat_orders"
+      ),
+      where(
+        "userId",
+        "==",
+        userId
+      )
     );
 
     return onSnapshot(
-      q,
-
+      ordersQuery,
       (snapshot) => {
+        const orders: WashyNeatOrder[] =
+          [];
 
-        const orders: WashyNeatOrder[] = [];
+        snapshot.forEach(
+          (docSnap) => {
+            orders.push({
+              id: docSnap.id,
+              ...docSnap.data(),
+            } as WashyNeatOrder);
+          }
+        );
 
-        snapshot.forEach((docSnap) => {
-
-          orders.push({
-            id: docSnap.id,
-            ...docSnap.data(),
-          } as WashyNeatOrder);
-
-        });
-
-
-        // Newest first
+        /**
+         * Sort newest first.
+         */
         orders.sort(
           (a, b) =>
             (b.createdAt?.seconds || 0) -
             (a.createdAt?.seconds || 0)
         );
 
-
         callback(orders);
       },
-
       (error) => {
-
         console.warn(
-          'Error listening to orders:',
+          "Error listening to orders:",
           error
         );
 
         callback([]);
       }
     );
-
   } catch (error) {
-
     console.warn(
-      'Firestore query error:',
+      "Firestore query error:",
       error
     );
 
