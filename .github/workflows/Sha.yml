@@ -1,0 +1,53 @@
+name: Create Android Signing Key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create-key:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Create release keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -keystore urbanwash-release.keystore \
+            -alias urbanwash \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -keypass "${{ secrets.KEY_PASSWORD }}" \
+            -dname "CN=Urban Wash,O=Urban Wash,L=Dar es Salaam,ST=Dar es Salaam,C=TZ"
+
+      - name: Show SHA fingerprints
+        run: |
+          echo "=========================================="
+          echo "ANDROID RELEASE SHA FINGERPRINTS"
+          echo "=========================================="
+
+          keytool -list \
+            -v \
+            -keystore urbanwash-release.keystore \
+            -alias urbanwash \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            | grep -E "SHA1:|SHA256:"
+
+          echo "=========================================="
+
+      - name: Upload keystore securely
+        uses: actions/upload-artifact@v4
+        with:
+          name: urbanwash-release-keystore
+          path: urbanwash-release.keystore
+          retention-days: 7
