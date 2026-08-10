@@ -37,8 +37,8 @@ const DEFAULT_FIREBASE_CONFIG = {
   authDomain: "washy-neat-app.firebaseapp.com",
   projectId: "gen-lang-client-0931280678",
   storageBucket: "gen-lang-client-0931280678.firebasestorage.app",
-  messagingSenderId: "102938475610",
-  appId: "1:102938475610:web:9876543210abcdef"
+  messagingSenderId: "1008039064034",
+  appId: "1:1008039064034:android:9a9b72de8077917986c9bb"
 };
 
 // Function to retrieve Firebase config from storage, env, or google-services.json format
