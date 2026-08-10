@@ -1,0 +1,175 @@
+name: Build WashyNeat APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Get the existing project exactly as it is in GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Node.js 22
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 3. Java 21
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 4. Install existing dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 5. Build the existing React/Vite application
+      - name: Build web application
+        run: npm run build
+
+      # 6. Verify Firebase configuration WITHOUT changing it
+      - name: Verify Firebase configuration
+        run: |
+          echo "=========================================="
+          echo "Checking Firebase configuration"
+          echo "=========================================="
+
+          if [ ! -f "android/app/google-services.json" ]; then
+            echo "❌ ERROR: google-services.json not found"
+            echo "Expected:"
+            echo "android/app/google-services.json"
+            exit 1
+          fi
+
+          echo "✅ google-services.json exists"
+
+          PACKAGE_NAME=$(python3 -c "
+          import json
+          with open('android/app/google-services.json') as f:
+              data=json.load(f)
+          print(data['client'][0]['client_info']['android_client_info']['package_name'])
+          ")
+
+          echo "Firebase package: $PACKAGE_NAME"
+
+          if [ "$PACKAGE_NAME" != "com.washyneat.app" ]; then
+            echo "❌ ERROR: Wrong Firebase package name"
+            echo "Expected: com.washyneat.app"
+            echo "Found: $PACKAGE_NAME"
+            exit 1
+          fi
+
+          echo "✅ Firebase package matches com.washyneat.app"
+
+      # 7. Verify existing Gradle configuration WITHOUT modifying it
+      - name: Verify Google Services Gradle configuration
+        run: |
+          echo "=========================================="
+          echo "Checking existing Gradle configuration"
+          echo "=========================================="
+
+          if grep -q "com.google.gms:google-services" android/build.gradle; then
+            echo "✅ Google Services dependency found in project-level build.gradle"
+          else
+            echo "❌ ERROR: Google Services dependency missing"
+            exit 1
+          fi
+
+          if grep -q "com.google.gms.google-services" android/app/build.gradle; then
+            echo "✅ Google Services plugin found in app-level build.gradle"
+          else
+            echo "❌ ERROR: Google Services plugin missing"
+            exit 1
+          fi
+
+          echo "✅ Existing Gradle configuration will be used unchanged"
+
+      # 8. Sync existing Capacitor Android project
+      # This does NOT create a new Android project.
+      - name: Sync existing Capacitor project
+        run: npx cap sync android
+
+      # 9. Make existing Gradle wrapper executable
+      - name: Prepare existing Gradle wrapper
+        run: chmod +x android/gradlew
+
+      # 10. Clean existing Android build
+      - name: Clean Android build
+        working-directory: android
+        run: ./gradlew clean
+
+      # 11. Build existing Android application
+      - name: Build WashyNeat APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      # 12. Verify APK
+      - name: Verify APK
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+
+          echo "=========================================="
+          echo "Checking APK"
+          echo "=========================================="
+
+          if [ -f "$APK" ]; then
+            echo "✅ BUILD SUCCESSFUL"
+            echo ""
+            echo "App: WashyNeat"
+            echo "Package: com.washyneat.app"
+            echo "Firebase configuration: detected"
+            echo "Google Services Gradle plugin: detected"
+            echo ""
+            ls -lh "$APK"
+          else
+            echo "❌ APK was not generated"
+            exit 1
+          fi
+
+      # 13. Upload APK
+      - name: Upload WashyNeat APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: washyneat-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+      # 14. Success message
+      - name: Success
+        if: success()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "🎉 WASHYNEAT BUILD SUCCESSFUL"
+          echo "=========================================="
+          echo "Package: com.washyneat.app"
+          echo "Firebase: Google Services detected"
+          echo "Gradle: Existing configuration preserved"
+          echo "APK: Generated successfully"
+          echo "=========================================="
+
+      # 15. Failure message
+      - name: Failure
+        if: failure()
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "❌ WASHYNEAT BUILD FAILED"
+          echo "=========================================="
+          echo ""
+          echo "The exact Gradle/Firebase error is shown"
+          echo "in the failed step above."
+          echo "=========================================="
