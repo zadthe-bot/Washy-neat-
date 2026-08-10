@@ -1,10 +1,10 @@
-name: Create Android Signing Key
+name: Create WashyNeat Android Signing Key
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   signing-key:
@@ -17,55 +17,55 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Create signing key
+      - name: Create WashyNeat signing key
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
-          if [ -f "urbanwash-release.keystore" ]; then
+          if [ -f "washyneat-release.keystore" ]; then
             echo "Keystore already exists. Reusing it."
           else
-            echo "Creating new Android release keystore..."
+            echo "Creating WashyNeat release keystore..."
 
             keytool -genkeypair \
               -v \
-              -keystore urbanwash-release.keystore \
-              -alias urbanwash \
+              -keystore washyneat-release.keystore \
+              -alias washyneat \
               -keyalg RSA \
               -keysize 2048 \
               -validity 10000 \
               -storepass "$KEYSTORE_PASSWORD" \
               -keypass "$KEYSTORE_PASSWORD" \
-              -dname "CN=Urban Wash,O=Urban Wash,C=TZ"
+              -dname "CN=WashyNeat,O=WashyNeat,C=TZ"
 
             echo "Keystore created successfully."
           fi
 
-      - name: Print SHA-1 and SHA-256
+      - name: Print SHA fingerprints
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           echo ""
           echo "=============================================="
-          echo "        URBAN WASH ANDROID FINGERPRINTS"
+          echo "       WASHYNEAT ANDROID FINGERPRINTS"
+          echo "       PACKAGE: com.washyneat.app"
           echo "=============================================="
           echo ""
 
           keytool -list \
             -v \
-            -keystore urbanwash-release.keystore \
-            -alias urbanwash \
+            -keystore washyneat-release.keystore \
+            -alias washyneat \
             -storepass "$KEYSTORE_PASSWORD" \
             | grep -E "SHA1:|SHA256:"
 
           echo ""
           echo "=============================================="
-          echo "IMPORTANT:"
           echo "Add BOTH fingerprints to Firebase."
           echo "=============================================="
 
-      - name: Upload keystore
+      - name: Upload WashyNeat keystore
         uses: actions/upload-artifact@v4
         with:
-          name: urbanwash-release-keystore
-          path: urbanwash-release.keystore
+          name: washyneat-release-keystore
+          path: washyneat-release.keystore
           retention-days: 7
