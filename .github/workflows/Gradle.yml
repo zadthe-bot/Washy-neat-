@@ -11,42 +11,58 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Get your repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2. Setup Node.js
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
+      # 3. Install npm dependencies
       - name: Install dependencies
         run: npm install
 
+      # 4. Build React/Vite web app
+      - name: Build web app
+        run: npm run build
+
+      # 5. Generate Android project and Gradle files
       - name: Generate Android project
         run: |
           if [ ! -d "android" ]; then
+            echo "Android project does not exist. Creating it..."
             npx cap add android
           else
-            echo "android folder already exists - skipping cap add android"
+            echo "Android project already exists. Skipping creation."
           fi
 
+      # 6. Sync web app into Android project
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Check generated Gradle files
-        run: |
-          echo "Checking Android project..."
-          test -f android/gradlew
-          test -f android/build.gradle
-          test -f android/app/build.gradle
-          echo "Gradle files found successfully."
-
+      # 7. Make Gradle executable
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
-      - name: Commit Android and Gradle files
+      # 8. Verify important Gradle files
+      - name: Verify Android Gradle files
+        run: |
+          echo "Checking Android project..."
+
+          test -f android/gradlew
+          test -f android/build.gradle
+          test -f android/settings.gradle
+          test -f android/app/build.gradle
+
+          echo "All required Gradle files exist."
+
+      # 9. Commit generated Android project
+      - name: Commit Android project
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -54,7 +70,7 @@ jobs:
           git add android
 
           if git diff --cached --quiet; then
-            echo "No Android changes to commit."
+            echo "No changes to commit."
           else
             git commit -m "Generate Android Gradle project"
             git push
